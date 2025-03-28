@@ -1,3 +1,6 @@
 streamlit
 azure-cosmos
 openai
+sklearn
+nltk
+numpy
