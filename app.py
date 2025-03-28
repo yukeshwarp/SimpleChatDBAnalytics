@@ -30,7 +30,7 @@ container = database.get_container_client(CONTAINER_NAME)
 From = ""
 To = ""
 # Streamlit App
-st.title("Azure Cosmos DB Chat Entries Viewer")
+st.title("ChatDB Analytics")
 
 with st.sidebar:
     # Slider to select the range of entries to fetch
