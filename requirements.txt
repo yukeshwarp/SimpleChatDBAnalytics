@@ -1,6 +1,6 @@
 streamlit
 azure-cosmos
 openai
-sklearn
+scikit-learn
 nltk
 numpy
