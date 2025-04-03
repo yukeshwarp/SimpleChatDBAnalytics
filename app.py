@@ -3,19 +3,13 @@ from azure.cosmos import CosmosClient
 from topicmodelling_dev import extract_topics_from_text
 import os
 from openai import AzureOpenAI
+from datetime import datetime
 
 ENDPOINT = os.getenv("DB_ENDPOINT")
 KEY =os.getenv("DB_KEY")
 DATABASE_NAME = os.getenv("DB_NAME")
 CONTAINER_NAME = os.getenv("DB_CONTAINER_NAME")
 # Redis connection details (replace with your actual values
-
-# LLM setup
-llmclient = AzureOpenAI(
-    azure_endpoint=os.getenv("LLM_ENDPOINT"),
-    api_key=os.getenv("LLM_KEY"),
-    api_version="2024-10-01-preview",
-)
 
 # Initialize session state
 if 'chats' not in st.session_state:
@@ -27,40 +21,56 @@ if 'messages' not in st.session_state:
 client = CosmosClient(ENDPOINT, KEY)
 database = client.get_database_client(DATABASE_NAME)
 container = database.get_container_client(CONTAINER_NAME)
-From = ""
-To = ""
+
 # Streamlit App
-st.title("ChatDB Analytics")
+st.title("Chat DB Analytics")
 
 with st.sidebar:
-    # Slider to select the range of entries to fetch
-    
-    limit = st.slider("Select the number of entries to fetch", min_value=2000, max_value=20000, value=4000, step=100)
-    start_offset = st.slider("Select the start offset", min_value=0, max_value=limit, value=0, step=100)
+    # Option to choose filtering method (by date range or number of entries)
+    filter_option = st.radio("Filter by:", ("Date Range", "Number of Entries"))
+
+    if filter_option == "Date Range":
+        # Date Range Picker for filtering results by date
+        start_date = st.date_input("Select start date", datetime.today())
+        end_date = st.date_input("Select end date", datetime.today())
+        limit = None  # Disable the limit slider for date range filtering
+        start_offset = None  # Disable the offset for date range filtering
+
+    elif filter_option == "Number of Entries":
+        # Slider to select the range of entries to fetch
+        limit = st.slider("Select the number of entries to fetch", min_value=1000, max_value=7000, value=2000, step=100)
+        start_offset = st.slider("Select the start offset", min_value=0, max_value=limit, value=0, step=100)
+        start_date = None  # Disable the date range inputs for number of entries filtering
+        end_date = None  # Disable the date range inputs for number of entries filtering
 
     # Fetch button
     fetch_button = st.button("Fetch Data")
     
     if fetch_button:
-        # Create Cosmos query to fetch data
-        query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c ORDER BY c.TimeStamp DESC OFFSET {start_offset} LIMIT {limit}"
-
         try:
+            if filter_option == "Date Range":
+                # Convert the selected dates to ISO 8601 format for the query
+                start_date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+                end_date_str = end_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+
+                # Create Cosmos query to fetch data within the date range
+                query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c WHERE c.TimeStamp BETWEEN '{start_date_str}' AND '{end_date_str}' ORDER BY c.TimeStamp DESC"
+
+            elif filter_option == "Number of Entries":
+                # Create Cosmos query to fetch data with the limit and offset
+                query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c ORDER BY c.TimeStamp DESC OFFSET {start_offset} LIMIT {limit}"
+
+            # Query Cosmos DB
             items = list(container.query_items(query=query, enable_cross_partition_query=True))
 
             # Display results
             if items:
-                st.write(f"Displaying {len(items)} chat entries starting from offset {start_offset}:")
-
-                # Limit chat title to 50 characters for readability
-                
+                st.write(f"Displaying {len(items)} chat entries:")
                 for i in range(len(items)):
                     items[i]["ChatTitle"] = items[i]["ChatTitle"][:50]
                 st.session_state['chats'] = list(items)
             else:
                 st.write("No data found for the selected range.")
-            From = items[0]['TimeStamp'][:10]
-            To = items[-1]['TimeStamp'][:10]
             
         except Exception as e:
             st.write(f"An error occurred: {str(e)}")
@@ -72,12 +82,12 @@ for message in st.session_state["messages"]:
         st.markdown(message["content"])
 st.markdown('</div>', unsafe_allow_html=True)
 
-chat_titles = [ chat["ChatTitle"] for chat in st.session_state["chats"]]
+chat_titles = [chat["ChatTitle"] for chat in st.session_state["chats"]]
 chat_titles_text = "\n".join(chat_titles)  # Join chat titles into a single text block
 topics = extract_topics_from_text(chat_titles_text)
-# st.write(chat_titles_text)
 
-if From:          
+if chat_titles:          
+    # Send chat titles to LLM for trend analysis
     trend_analysis_response = llmclient.chat.completions.create(
         model="gpt-4o",
         messages=[ 
@@ -97,14 +107,19 @@ if From:
     # Display the trend analysis at the top
     trend_analysis = trend_analysis_response.choices[0].message.content
     st.write("### Trend Analysis")
-    st.session_state["messages"].append({"role": "assistant", "content":trend_analysis})
+    st.session_state["messages"].append({"role": "assistant", "content": trend_analysis})
     st.markdown(trend_analysis)
-            
 
 with st.sidebar:
-    st.write(f"Data Range")
-    st.write(f"From: {From}")
-    st.write(f"To: {To}")
+    if filter_option == "Date Range":
+        st.write(f"Data Range")
+        st.write(f"From: {start_date}")
+        st.write(f"To: {end_date}")
+    elif filter_option == "Number of Entries":
+        st.write(f"Entries Fetching")
+        st.write(f"Limit: {limit}")
+        st.write(f"Start Offset: {start_offset}")
+
 # User input for questions
 if prompt := st.chat_input("Ask a question"):
     # Extract only ChatTitle from the fetched data for LLM
