@@ -10,7 +10,11 @@ KEY =os.getenv("DB_KEY")
 DATABASE_NAME = os.getenv("DB_NAME")
 CONTAINER_NAME = os.getenv("DB_CONTAINER_NAME")
 # Redis connection details (replace with your actual values
-
+llmclient = AzureOpenAI(
+    azure_endpoint=os.getenv("LLM_ENDPOINT"),
+    api_key=os.getenv("LLM_KEY"),
+    api_version="2024-10-01-preview",
+)
 # Initialize session state
 if 'chats' not in st.session_state:
     st.session_state['chats'] = []
@@ -38,7 +42,7 @@ with st.sidebar:
 
     elif filter_option == "Number of Entries":
         # Slider to select the range of entries to fetch
-        limit = st.slider("Select the number of entries to fetch", min_value=1000, max_value=7000, value=2000, step=100)
+        limit = st.slider("Select the number of entries to fetch", min_value=1000, max_value=20000, value=2000, step=100)
         start_offset = st.slider("Select the start offset", min_value=0, max_value=limit, value=0, step=100)
         start_date = None  # Disable the date range inputs for number of entries filtering
         end_date = None  # Disable the date range inputs for number of entries filtering
