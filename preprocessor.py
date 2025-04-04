@@ -5,15 +5,15 @@ from nltk.tokenize import word_tokenize, sent_tokenize
 from spacy.lang.en import English
 from transformers import pipeline
 import re
+from spacy.cli import download
 
-import spacy
+# Try to load the model, and if it doesn't exist, download it
 try:
     nlp = spacy.load("en_core_web_sm")
 except OSError:
-    # If the model is not found, download it first
-    from spacy.cli import download
     download("en_core_web_sm")
     nlp = spacy.load("en_core_web_sm")
+
 
 
 nltk.download("punkt", quiet=True)
