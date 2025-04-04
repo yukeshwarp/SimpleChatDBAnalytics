@@ -1,6 +1,10 @@
+nltk
+spacy
+transformers
 streamlit
+datetime
 azure-cosmos
 openai
-scikit-learn
-nltk
-numpy
+torch
+torchvision 
+torchaudio
