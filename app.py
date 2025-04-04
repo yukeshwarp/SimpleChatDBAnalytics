@@ -1,30 +1,20 @@
 import streamlit as st
-from azure.cosmos import CosmosClient
-from topicmodelling_dev import extract_topics_from_text
-import os
-from openai import AzureOpenAI
 from datetime import datetime
+from cloud_config import *
+from topicmodelling_dev import extract_topics_from_text
+from preprocessor import preprocess_text
+from azure.cosmos import CosmosClient
 
-ENDPOINT = os.getenv("DB_ENDPOINT")
-KEY =os.getenv("DB_KEY")
-DATABASE_NAME = os.getenv("DB_NAME")
-CONTAINER_NAME = os.getenv("DB_CONTAINER_NAME")
-# Redis connection details (replace with your actual values
-llmclient = AzureOpenAI(
-    azure_endpoint=os.getenv("LLM_ENDPOINT"),
-    api_key=os.getenv("LLM_KEY"),
-    api_version="2024-10-01-preview",
-)
+
+client = CosmosClient(ENDPOINT, KEY)
+database = client.get_database_client(DATABASE_NAME)
+container = database.get_container_client(CONTAINER_NAME)
+
 # Initialize session state
 if 'chats' not in st.session_state:
     st.session_state['chats'] = []
 if 'messages' not in st.session_state:
     st.session_state['messages'] = []
-
-# Initialize CosmosClient
-client = CosmosClient(ENDPOINT, KEY)
-database = client.get_database_client(DATABASE_NAME)
-container = database.get_container_client(CONTAINER_NAME)
 
 # Streamlit App
 st.title("Chat DB Analytics")
@@ -42,7 +32,10 @@ with st.sidebar:
 
     elif filter_option == "Number of Entries":
         # Slider to select the range of entries to fetch
-        limit = st.slider("Select the number of entries to fetch", min_value=1000, max_value=20000, value=2000, step=100)
+        query_len = """SELECT VALUE COUNT(c.id) FROM c """
+        res = list(container.query_items(query=query_len, enable_cross_partition_query=True))
+        num_ent = res[0]
+        limit = st.slider("Select the number of entries to fetch", min_value=1000, max_value=num_ent, value=2000, step=100)
         start_offset = st.slider("Select the start offset", min_value=0, max_value=limit, value=0, step=100)
         start_date = None  # Disable the date range inputs for number of entries filtering
         end_date = None  # Disable the date range inputs for number of entries filtering
@@ -53,15 +46,11 @@ with st.sidebar:
     if fetch_button:
         try:
             if filter_option == "Date Range":
-                # Convert the selected dates to ISO 8601 format for the query
                 start_date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
                 end_date_str = end_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
-
-                # Create Cosmos query to fetch data within the date range
                 query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c WHERE c.TimeStamp BETWEEN '{start_date_str}' AND '{end_date_str}' ORDER BY c.TimeStamp DESC"
 
             elif filter_option == "Number of Entries":
-                # Create Cosmos query to fetch data with the limit and offset
                 query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c ORDER BY c.TimeStamp DESC OFFSET {start_offset} LIMIT {limit}"
 
             # Query Cosmos DB
@@ -86,9 +75,11 @@ for message in st.session_state["messages"]:
         st.markdown(message["content"])
 st.markdown('</div>', unsafe_allow_html=True)
 
-chat_titles = [chat["ChatTitle"] for chat in st.session_state["chats"]]
+chat_titles = [chat["ChatTitle"][:50] for chat in st.session_state["chats"]]
 chat_titles_text = "\n".join(chat_titles)  # Join chat titles into a single text block
+# st.write(chat_titles_text)
 topics = extract_topics_from_text(chat_titles_text)
+processed_chat_titles = preprocess_text(chat_titles_text)
 
 if chat_titles:          
     # Send chat titles to LLM for trend analysis
@@ -101,7 +92,7 @@ if chat_titles:
                 Provide a summary of key trends and observations.
                 
                 Chat Titles:
-                {chat_titles_text}
+                {processed_chat_titles}
             """}
         ],
         temperature=0.7,
@@ -144,7 +135,7 @@ if prompt := st.chat_input("Ask a question"):
                         The database contains usage history of user questions and AI responses from an AI-assisted chatbot interface, specifically used for legal advice.
 
                         User Chat Titles: 
-                        {chat_titles_text}
+                        {processed_chat_titles}
                         Highlighted topics:
                         {topics}
 
