@@ -5,3 +5,4 @@ datetime
 azure-cosmos
 openai
 scikit-learn
+spacy
