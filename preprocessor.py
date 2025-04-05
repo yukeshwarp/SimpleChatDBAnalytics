@@ -1,7 +1,7 @@
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize, sent_tokenize
-from spacy.lang.en import English
+# from spacy.lang.en import English
 from transformers import pipeline
 import re
 # from spacy.cli import download
