@@ -21,14 +21,65 @@ st.title("Chat DB Analytics")
 
 with st.sidebar:
     # Option to choose filtering method (by date range or number of entries)
-    filter_option = st.radio("Filter by:", ("Date Range", "Number of Entries"))
+    filter_option = st.radio("Filter by:", ("Date Range", "Number of Entries", "Custom Date Range"))
 
     if filter_option == "Date Range":
-        # Date Range Picker for filtering results by date
-        start_date = st.date_input("Select start date", datetime.today())
-        end_date = st.date_input("Select end date", datetime.today())
-        limit = None  # Disable the limit slider for date range filtering
-        start_offset = None  # Disable the offset for date range filtering
+        range_opt = st.selectbox("Range by:", ("Monthly", "Quarterly"))
+        
+        if range_opt == "Monthly":
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                Mont = "01"
+                Mont = st.radio("Month:", ("01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"))
+            with col2:
+                yr = "2023"
+                yr = st.radio("Year:", ("2023", "2024", "2025"))
+            if Mont=="02":
+                start_date = yr + '/' + Mont + '/' + "01"
+                end_date = yr + '/' + Mont + '/' + "28"
+            elif Mont=="01" or Mont=="03" or Mont=="05" or Mont=="07" or Mont=="08" or Mont=="10" or Mont=="12":
+                start_date = yr + '/' + Mont + '/' + "01"
+                end_date = yr + '/' + Mont + '/' + "31"
+            else:
+                start_date = yr + '/' + Mont + '/' + "01"
+                end_date = yr + '/' + Mont + '/' + "30"
+            limit = None  # Disable the limit slider for date range filtering
+            start_offset = None  # Disable the offset for date range filtering
+            
+        elif range_opt == "Quarterly":
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                quarter = st.radio("Quarter:", ("Q1", "Q2", "Q3", "Q4"))
+            with col2:
+                yr = st.radio("Year:", ("2023", "2024", "2025"))
+            
+            # Determine the start and end date based on the selected quarter
+            if quarter == "Q1":
+                start_date = yr + "/01/01"
+                end_date = yr + "/03/31"
+            elif quarter == "Q2":
+                start_date = yr + "/04/01"
+                end_date = yr + "/06/30"
+            elif quarter == "Q3":
+                start_date = yr + "/07/01"
+                end_date = yr + "/09/30"
+            elif quarter == "Q4":
+                start_date = yr + "/10/01"
+                end_date = yr + "/12/31"
+            limit = None  # Disable the limit slider for date range filtering
+            start_offset = None  # Disable the offset for date range filtering
+
+    elif filter_option == "Custom Date Range":
+        # Custom date range input
+        start_date = st.date_input("Start Date")
+        end_date = st.date_input("End Date")
+        
+        # Format the selected dates as strings
+        start_date_str = start_date.strftime("%Y-%m-%d")
+        end_date_str = end_date.strftime("%Y-%m-%d")
+        
+        limit = None  # Disable the limit slider for custom date range filtering
+        start_offset = None  # Disable the offset for custom date range filtering
 
     elif filter_option == "Number of Entries":
         # Slider to select the range of entries to fetch
@@ -39,17 +90,24 @@ with st.sidebar:
         start_offset = st.slider("Select the start offset", min_value=0, max_value=limit, value=0, step=100)
         start_date = None  # Disable the date range inputs for number of entries filtering
         end_date = None  # Disable the date range inputs for number of entries filtering
-
+    st.write("---")
     # Fetch button
     fetch_button = st.button("Fetch Data")
     
     if fetch_button:
         try:
             if filter_option == "Date Range":
-                start_date_str = start_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
-                end_date_str = end_date.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
-                query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c WHERE c.TimeStamp BETWEEN '{start_date_str}' AND '{end_date_str}' ORDER BY c.TimeStamp DESC"
+                # Handle both Monthly and Quarterly
+                start_date_obj = datetime.strptime(start_date, "%Y/%m/%d")
+                end_date_obj = datetime.strptime(end_date, "%Y/%m/%d")
 
+                start_date_str = start_date_obj.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+                end_date_str = end_date_obj.strftime("%Y-%m-%dT%H:%M:%S.000000Z")
+                
+                query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c WHERE c.TimeStamp BETWEEN '{start_date_str}' AND '{end_date_str}' ORDER BY c.TimeStamp DESC"
+            elif filter_option == "Custom Date Range":
+                # Use the custom date range selected by the user
+                query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c WHERE c.TimeStamp BETWEEN '{start_date_str}T00:00:00.000000Z' AND '{end_date_str}T23:59:59.999999Z' ORDER BY c.TimeStamp DESC"
             elif filter_option == "Number of Entries":
                 query = f"SELECT c.id, c.TimeStamp, c.AssistantName, c.ChatTitle FROM c ORDER BY c.TimeStamp DESC OFFSET {start_offset} LIMIT {limit}"
 
@@ -110,6 +168,10 @@ with st.sidebar:
         st.write(f"Data Range")
         st.write(f"From: {start_date}")
         st.write(f"To: {end_date}")
+    elif filter_option == "Custom Date Range":
+        st.write(f"Custom Date Range:")
+        st.write(f"From: {start_date_str}")
+        st.write(f"To: {end_date_str}")
     elif filter_option == "Number of Entries":
         st.write(f"Entries Fetching")
         st.write(f"Limit: {limit}")
