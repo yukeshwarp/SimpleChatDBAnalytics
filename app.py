@@ -179,7 +179,7 @@ with tab2:
         content = ""
         for i in range(4000):
             content += items_ana[i]["TimeStamp"] + items_ana[i]["ChatTitle"][:30]
-
+        content = preprocess_text(content)
         response = llmclient.chat.completions.create(
                         model="gpt-4o",
                         messages=[ 
