@@ -2,7 +2,7 @@ import os
 from openai import AzureOpenAI
 
 ENDPOINT = os.getenv("DB_ENDPOINT")
-KEY =os.getenv("DB_KEY")
+KEY = os.getenv("DB_KEY")
 DATABASE_NAME = os.getenv("DB_NAME")
 CONTAINER_NAME = os.getenv("DB_CONTAINER_NAME")
 
