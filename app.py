@@ -1,6 +1,6 @@
 import streamlit as st
 from datetime import datetime
-from cloud_config import *
+from cloud_config import CONTAINER_NAME, ENDPOINT,DATABASE_NAME, llmclient, KEY
 from topicmodelling_dev import extract_topics_from_text
 from preprocessor import preprocess_text
 from azure.cosmos import CosmosClient
@@ -17,12 +17,12 @@ if "messages" not in st.session_state:
 if "Analysis" not in st.session_state:
     st.session_state["Analysis"] = ""
 
-
+st.title("Chat DB Analytics")
 tab1, tab2 = st.tabs(["Chat", "Analytics"])
 
 # Streamlit App
 with tab1:
-    st.title("Chat DB Analytics")
+    
 
     with st.sidebar:
         # Option to choose filtering method (by date range or number of entries)
@@ -371,17 +371,17 @@ with tab2:
     q3, q4 = st.columns(2)
 
     with q1.container(height=450, border=True):
-        st.subheader("Q1 Topics")
+        st.markdown("**Q1 Topics**")
         st.write(get_top_topics(*quarters["Q1"]))
 
     with q2.container(height=450, border=True):
-        st.subheader("Q2 Topics")
+        st.markdown("**Q2 Topics**")
         st.write(get_top_topics(*quarters["Q2"]))
 
     with q3.container(height=450, border=True):
-        st.subheader("Q3 Topics")
+        st.markdown("**Q3 Topics**")
         st.write(get_top_topics(*quarters["Q3"]))
 
     with q4.container(height=450, border=True):
-        st.subheader("Q4 Topics")
+        st.markdown("**Q4 Topics**")
         st.write(get_top_topics(*quarters["Q4"]))
