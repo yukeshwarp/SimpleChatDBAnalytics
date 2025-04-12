@@ -1,8 +1,5 @@
 import os
 from openai import AzureOpenAI
-from dotenv import load_dotenv
-
-load_dotenv()
 
 ENDPOINT = os.getenv("DB_ENDPOINT")
 KEY = os.getenv("DB_KEY")
