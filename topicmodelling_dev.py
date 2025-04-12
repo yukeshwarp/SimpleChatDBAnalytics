@@ -5,19 +5,21 @@ import re
 import nltk
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
-import numpy as np
+import json
 import os
 from openai import AzureOpenAI
 
+# Initialize Azure OpenAI client
 llmclient = AzureOpenAI(
     azure_endpoint=os.getenv("LLM_ENDPOINT"),
     api_key=os.getenv("LLM_KEY"),
     api_version="2024-10-01-preview",
 )
+
 # Download required NLTK resources
 nltk.download("stopwords", quiet=True)
 nltk.download("wordnet", quiet=True)
-nltk.download("punkt_tab", quiet=True)  # Fixed: 'punkt' instead of 'punkt_tab'
+nltk.download("punkt", quiet=True)  # Fixed the incorrect 'punkt_tab'
 
 
 def preprocess_text(text):
@@ -37,7 +39,7 @@ def preprocess_text(text):
 
 
 def extract_topics_from_text(text, max_topics=5, max_top_words=10):
-    """Extract topics using NMF and return structured topic data."""
+    """Extract topics using NMF and return structured topic data in JSON format."""
     try:
         cleaned_text = preprocess_text(text)
         if len(cleaned_text.split()) < 10:
@@ -96,9 +98,14 @@ def extract_topics_from_text(text, max_topics=5, max_top_words=10):
             )
 
         topic_analysis = ""
-        for topicss in topics:
-            for topic in topicss["keywords"]:
-                topic_analysis += f"{topic['term']} with weight {topic['weight']}\n "
+        for topic_item in topics:
+            topic_analysis += (
+                f"Topic {topic_item['topic']} (score: {topic_item['score']:.2f}):\n"
+            )
+            for keyword in topic_item["keywords"]:
+                topic_analysis += (
+                    f"- {keyword['term']} (weight: {keyword['weight']:.2f})\n"
+                )
 
         return interpret_topics_with_llm(text, topic_analysis)
 
@@ -109,26 +116,27 @@ def extract_topics_from_text(text, max_topics=5, max_top_words=10):
 
 def interpret_topics_with_llm(text, raw_topics):
     """
-    Use LLM to interpret raw topics and return structured interpretations.
-    This function should be called separately from extract_topics_from_text
-    if LLM interpretation is needed.
+    Use LLM to interpret raw topics and return structured interpretations in JSON format.
     """
     try:
         prompt = f"""
-        I need you to analyze the following text and the extracted topic keywords to identify 
-        the main themes and topics. For each theme, provide a concise label and a brief description.
-        
+        Analyze the following text and the extracted topic keywords to identify the main themes and topics.
+
         Text excerpt: {text[:1000]}... (truncated for brevity)
         
         Raw extracted topics:
         {raw_topics}
         
-        Please respond with:
-        1. Main themes you identify from the text and keywords
-        2. For each theme, provide a concise label and a 1-2 sentence description
-        3. Any notable subtopics or related concepts
+        Return a JSON array of topic objects with the following structure:
+        [
+            {{
+                "label": "Clear topic name",
+                "description": "Brief 1-2 sentence description of the topic"
+            }},
+            ...
+        ]
         
-        Return the identifies topics by separating with commas. Return only the topics strictly with no additional texts.
+        Ensure your response can be parsed as valid JSON. Return ONLY the JSON array and nothing else.
         """
 
         response = llmclient.chat.completions.create(
@@ -136,7 +144,7 @@ def interpret_topics_with_llm(text, raw_topics):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a topic analysis expert who can identify meaningful themes and topics from text.",
+                    "content": "You are a topic analysis expert who can identify meaningful themes and topics from text and return them in valid JSON format.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -145,66 +153,28 @@ def interpret_topics_with_llm(text, raw_topics):
 
         interpreted_content = response.choices[0].message.content
 
-        return interpreted_content
+        # Try to parse the response as JSON
+        try:
+            parsed_topics = json.loads(interpreted_content)
+            return parsed_topics
+        except json.JSONDecodeError:
+            # If direct parsing fails, try to extract JSON from the response
+            json_pattern = r"\[[\s\S]*\]"
+            match = re.search(json_pattern, interpreted_content)
+            if match:
+                try:
+                    json_str = match.group(0)
+                    parsed_topics = json.loads(json_str)
+                    return parsed_topics
+                except json.JSONDecodeError:
+                    pass
+
+            # Fallback: return a basic structure with the raw content
+            logging.warning(
+                "Failed to parse LLM response as JSON, returning raw content"
+            )
+            return [{"label": "Topic analysis", "description": interpreted_content}]
 
     except Exception as e:
         logging.error(f"Error interpreting topics with LLM: {e}")
         return []
-
-
-def parse_interpreted_topics(interpreted_content):
-    """
-    Converts raw LLM response into structured topic data (list of dicts).
-    """
-    topics = []
-
-    lines = interpreted_content.split("\n")
-    current_topic = {}
-
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-
-        # Check for numbered list items that likely indicate new topics
-        if re.match(r"^\d+\.", line):
-            if current_topic and "label" in current_topic:  # Save the previous topic
-                topics.append(current_topic)
-            current_topic = {}
-
-            # Extract label and description if they're on the same line
-            parts = line.split(":", 1)
-            if len(parts) > 1:
-                label = parts[0].strip()
-                # Remove the number prefix
-                label = re.sub(r"^\d+\.\s*", "", label)
-                current_topic["label"] = label
-                current_topic["description"] = parts[1].strip()
-            else:
-                # Just store the label for now
-                label = line.strip()
-                label = re.sub(r"^\d+\.\s*", "", label)
-                current_topic["label"] = label
-
-        # If we're in a topic and this line has a description
-        elif (
-            current_topic
-            and ":" in line
-            and "label" in current_topic
-            and "description" not in current_topic
-        ):
-            parts = line.split(":", 1)
-            current_topic["description"] = parts[1].strip()
-
-        # If this is a continuation of a description
-        elif current_topic and "label" in current_topic:
-            if "description" in current_topic:
-                current_topic["description"] += " " + line
-            else:
-                current_topic["description"] = line
-
-    # Add the last topic if it exists
-    if current_topic and "label" in current_topic:
-        topics.append(current_topic)
-
-    return topics
