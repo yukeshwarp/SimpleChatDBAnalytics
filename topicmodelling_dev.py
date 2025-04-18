@@ -2,12 +2,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.decomposition import NMF
 import logging
 import re
-import nltk
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
 import json
 import os
 from openai import AzureOpenAI
+from preprocessor import clean_text
+
 
 # Initialize Azure OpenAI client
 llmclient = AzureOpenAI(
@@ -16,32 +15,11 @@ llmclient = AzureOpenAI(
     api_version="2024-10-01-preview",
 )
 
-# Download required NLTK resources
-nltk.download("stopwords", quiet=True)
-nltk.download("wordnet", quiet=True)
-nltk.download("punkt", quiet=True)  # Fixed the incorrect 'punkt_tab'
-
-
-def preprocess_text(text):
-    """Cleans text by removing special characters, stopwords, and lemmatizing."""
-    stop_words = set(stopwords.words("english"))
-    lemmatizer = WordNetLemmatizer()
-
-    text = re.sub(r"[^a-zA-Z\s]", " ", text)
-    words = text.lower().split()
-    cleaned_words = [
-        lemmatizer.lemmatize(word)
-        for word in words
-        if word not in stop_words and len(word) > 2
-    ]
-
-    return " ".join(cleaned_words)
-
 
 def extract_topics_from_text(text, max_topics=5, max_top_words=10):
     """Extract topics using NMF and return structured topic data in JSON format."""
     try:
-        cleaned_text = preprocess_text(text)
+        cleaned_text = clean_text(text)
         if len(cleaned_text.split()) < 10:
             logging.warning("Text too short for meaningful topic extraction")
             return []
@@ -55,7 +33,7 @@ def extract_topics_from_text(text, max_topics=5, max_top_words=10):
         )
 
         # Split text into sentences or chunks
-        sentences = nltk.sent_tokenize(text)
+        sentences = text.split(".")
         if len(sentences) < 3:
             sentences = [
                 text[i : i + 100]
