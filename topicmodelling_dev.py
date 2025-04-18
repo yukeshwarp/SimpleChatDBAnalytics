@@ -5,7 +5,7 @@ import re
 import json
 import os
 from openai import AzureOpenAI
-from preprocessor import clean_text
+from preprocessor import preprocess_text
 
 
 # Initialize Azure OpenAI client
@@ -19,7 +19,7 @@ llmclient = AzureOpenAI(
 def extract_topics_from_text(text, max_topics=5, max_top_words=10):
     """Extract topics using NMF and return structured topic data in JSON format."""
     try:
-        cleaned_text = clean_text(text)
+        cleaned_text = preprocess_text(text)
         if len(cleaned_text.split()) < 10:
             logging.warning("Text too short for meaningful topic extraction")
             return []
