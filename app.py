@@ -204,7 +204,7 @@ with st.sidebar:
                 if chat_titles:
                     with st.spinner("Analyzing trends..."):
                         trend_analysis_response = llmclient.chat.completions.create(
-                            model="gpt-4o",
+                            model="gpt-4.1",
                             messages=[
                                 {
                                     "role": "system",
@@ -276,7 +276,7 @@ if st.session_state["current_view"] == "Chat":
 
             with st.spinner("Thinking..."):
                 response_stream = llmclient.chat.completions.create(
-                    model="gpt-4o",
+                    model="gpt-4.1",
                     messages=[
                         {
                             "role": "system",
@@ -362,7 +362,7 @@ elif st.session_state["current_view"] == "Analytics":
 
         # LLM call for top 10 topics
         response = llmclient.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.1",
             messages=[
                 {
                     "role": "system",
