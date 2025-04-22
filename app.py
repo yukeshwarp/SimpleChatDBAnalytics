@@ -366,11 +366,12 @@ elif st.session_state["current_view"] == "Analytics":
             messages=[
                 {
                     "role": "system",
-                    "content": "You are a legal domain expert extracting top 10 unique topics from user chat titles. Respond with the list only, no explanation.",
+                    "content": "You're a very intelligent assistant.",
                 },
                 {
                     "role": "user",
                     "content": f"""
+                    You are a legal domain expert extracting top 10 unique topics from user chat titles. Respond with the list only, no explanation.
                     From the following user chat titles, identify and list the top 10 unique topics discussed. Do not add any explanation or extra words.
 
                     Chat Titles:
