@@ -204,7 +204,7 @@ with st.sidebar:
                 if chat_titles:
                     with st.spinner("Analyzing trends..."):
                         trend_analysis_response = llmclient.chat.completions.create(
-                            model="gpt-4.1",
+                            model="gpt-4o",
                             messages=[
                                 {
                                     "role": "system",
@@ -276,7 +276,7 @@ if st.session_state["current_view"] == "Chat":
 
             with st.spinner("Thinking..."):
                 response_stream = llmclient.chat.completions.create(
-                    model="gpt-4.1",
+                    model="gpt-4o",
                     messages=[
                         {
                             "role": "system",
@@ -362,16 +362,15 @@ elif st.session_state["current_view"] == "Analytics":
 
         # LLM call for top 10 topics
         response = llmclient.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-4o",
             messages=[
                 {
                     "role": "system",
-                    "content": "You're a very intelligent assistant.",
+                    "content": "You are a legal domain expert extracting top 10 unique topics from user chat titles. Respond with the list only, no explanation.",
                 },
                 {
                     "role": "user",
                     "content": f"""
-                    You are a legal domain expert extracting top 10 unique topics from user chat titles. Respond with the list only, no explanation.
                     From the following user chat titles, identify and list the top 10 unique topics discussed. Do not add any explanation or extra words.
 
                     Chat Titles:
